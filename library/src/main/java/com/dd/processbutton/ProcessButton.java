@@ -241,10 +241,6 @@ public abstract class ProcessButton extends FlatButton {
         mCompleteDrawable = completeDrawable;
     }
 
-    public void setProgressDrawable(GradientDrawable progressDrawable) {
-        mProgressDrawable = progressDrawable;
-    }
-
     public void setNormalText(CharSequence normalText) {
         super.setNormalText(normalText);
         if (mProgress == mMinProgress) {
