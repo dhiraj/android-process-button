@@ -3,6 +3,7 @@ package com.dd.processbutton;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -10,17 +11,29 @@ import android.util.AttributeSet;
 
 public abstract class ProcessButton extends FlatButton {
 
+    public enum State {
+        NORMAL,
+        PROGRESS,
+        COMPLETE,
+        ERROR;
+    }
+
     private int mProgress;
     private int mMaxProgress;
     private int mMinProgress;
 
-    private GradientDrawable mProgressDrawable;
+    private GradientDrawable mProgressLineDrawable;
     private GradientDrawable mCompleteDrawable;
     private GradientDrawable mErrorDrawable;
+    private GradientDrawable mProgressDrawable;
+    private GradientDrawable mDisabledDrawable;
 
     private CharSequence mLoadingText;
     private CharSequence mCompleteText;
     private CharSequence mErrorText;
+    private CharSequence mDisabledText;
+
+    private State mCurrentState;
 
     public ProcessButton(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
@@ -41,14 +54,16 @@ public abstract class ProcessButton extends FlatButton {
         mMinProgress = 0;
         mMaxProgress = 100;
 
-        mProgressDrawable = (GradientDrawable) getDrawable(R.drawable.rect_progress).mutate();
-        mProgressDrawable.setCornerRadius(getCornerRadius());
+        mProgressLineDrawable = (GradientDrawable) getDrawable(R.drawable.rect_progress_line).mutate();
+        mProgressLineDrawable.setCornerRadius(getCornerRadius());
 
         mCompleteDrawable = (GradientDrawable) getDrawable(R.drawable.rect_complete).mutate();
         mCompleteDrawable.setCornerRadius(getCornerRadius());
 
         mErrorDrawable = (GradientDrawable) getDrawable(R.drawable.rect_error).mutate();
         mErrorDrawable.setCornerRadius(getCornerRadius());
+
+        mCurrentState = State.NORMAL;
 
         if (attrs != null) {
             initAttributes(context, attrs);
@@ -66,10 +81,11 @@ public abstract class ProcessButton extends FlatButton {
             mLoadingText = attr.getString(R.styleable.ProcessButton_pb_textProgress);
             mCompleteText = attr.getString(R.styleable.ProcessButton_pb_textComplete);
             mErrorText = attr.getString(R.styleable.ProcessButton_pb_textError);
+            mDisabledText = attr.getString(R.styleable.ProcessButton_pb_textDisabled);
 
-            int purple = getColor(R.color.purple_progress);
-            int colorProgress = attr.getColor(R.styleable.ProcessButton_pb_colorProgress, purple);
-            mProgressDrawable.setColor(colorProgress);
+            int purple = getColor(R.color.purple_progress_line);
+            int colorProgressLine = attr.getColor(R.styleable.ProcessButton_pb_colorProgressLine, purple);
+            mProgressLineDrawable.setColor(colorProgressLine);
 
             int green = getColor(R.color.green_complete);
             int colorComplete = attr.getColor(R.styleable.ProcessButton_pb_colorComplete, green);
@@ -78,6 +94,17 @@ public abstract class ProcessButton extends FlatButton {
             int red = getColor(R.color.red_error);
             int colorError = attr.getColor(R.styleable.ProcessButton_pb_colorError, red);
             mErrorDrawable.setColor(colorError);
+
+            if (attr.hasValue(R.styleable.ProcessButton_pb_colorProgress)) {
+                mProgressDrawable = (GradientDrawable) getDrawable(R.drawable.rect_progress).mutate();
+                mProgressDrawable.setCornerRadius(getCornerRadius());
+                mProgressDrawable.setColor(attr.getColor(R.styleable.ProcessButton_pb_colorProgress, getColor(R.color.blue_normal)));
+            }
+            if (attr.hasValue(R.styleable.ProcessButton_pb_colorDisabled)) {
+                mDisabledDrawable = (GradientDrawable) getDrawable(R.drawable.rect_disabled).mutate();
+                mDisabledDrawable.setCornerRadius(getCornerRadius());
+                mDisabledDrawable.setColor(attr.getColor(R.styleable.ProcessButton_pb_colorDisabled, getColor(R.color.grey_disabled)));
+            }
 
         } finally {
             attr.recycle();
@@ -94,7 +121,7 @@ public abstract class ProcessButton extends FlatButton {
         } else if (mProgress < mMinProgress){
             onErrorState();
         } else {
-            onProgress();
+            onProgressState();
         }
 
         invalidate();
@@ -104,14 +131,18 @@ public abstract class ProcessButton extends FlatButton {
         if(getErrorText() != null) {
             setText(getErrorText());
         }
+
         setBackgroundCompat(getErrorDrawable());
+        mCurrentState = State.ERROR;
     }
 
-    protected void onProgress() {
+    protected void onProgressState() {
         if(getLoadingText() != null) {
             setText(getLoadingText());
         }
-        setBackgroundCompat(getNormalDrawable());
+        setBackgroundCompat(getProgressDrawable());
+//        setBackgroundCompat(getNormalDrawable());
+        mCurrentState = State.PROGRESS;
     }
 
     protected void onCompleteState() {
@@ -119,6 +150,7 @@ public abstract class ProcessButton extends FlatButton {
             setText(getCompleteText());
         }
         setBackgroundCompat(getCompleteDrawable());
+        mCurrentState = State.COMPLETE;
     }
 
     protected void onNormalState() {
@@ -126,6 +158,16 @@ public abstract class ProcessButton extends FlatButton {
             setText(getNormalText());
         }
         setBackgroundCompat(getNormalDrawable());
+        mCurrentState = State.NORMAL;
+    }
+
+    protected void onDisabledState() {
+        if(getDisabledText() != null) {
+            setText(getDisabledText());
+        }
+        if(getDisabledDrawable() != null) {
+            setBackgroundCompat(getDisabledDrawable());
+        }
     }
 
     @Override
@@ -152,12 +194,16 @@ public abstract class ProcessButton extends FlatButton {
         return mMinProgress;
     }
 
-    public GradientDrawable getProgressDrawable() {
-        return mProgressDrawable;
+    public GradientDrawable getProgressLineDrawable() {
+        return mProgressLineDrawable;
     }
 
     public GradientDrawable getCompleteDrawable() {
         return mCompleteDrawable;
+    }
+
+    public Drawable getProgressDrawable() {
+        return mProgressDrawable == null ? getNormalDrawable() : mProgressDrawable;
     }
 
     public CharSequence getLoadingText() {
@@ -166,6 +212,25 @@ public abstract class ProcessButton extends FlatButton {
 
     public CharSequence getCompleteText() {
         return mCompleteText;
+    }
+
+    public void setProgressLineDrawable(GradientDrawable progressLineDrawable) {
+        mProgressLineDrawable = progressLineDrawable;
+    }
+    public State getState() {
+        return mCurrentState;
+    }
+
+    public CharSequence getDisabledText() {
+        return mDisabledText;
+    }
+
+    public Drawable getDisabledDrawable() {
+        return mDisabledDrawable;
+    }
+
+    public void setDisabledDrawable(GradientDrawable disabledDrawable) {
+        mDisabledDrawable = disabledDrawable;
     }
 
     public void setProgressDrawable(GradientDrawable progressDrawable) {
@@ -189,6 +254,10 @@ public abstract class ProcessButton extends FlatButton {
 
     public void setCompleteText(CharSequence completeText) {
         mCompleteText = completeText;
+    }
+
+    public void setDisabledText(CharSequence disabledText) {
+        mDisabledText = disabledText;
     }
 
     public GradientDrawable getErrorDrawable() {
@@ -225,6 +294,31 @@ public abstract class ProcessButton extends FlatButton {
             setProgress(mProgress);
         } else {
             super.onRestoreInstanceState(state);
+        }
+    }
+
+    @Override
+    public void setEnabled(boolean enabled) {
+        if (enabled != super.isEnabled()) {
+            if (!enabled) {
+                onDisabledState();
+            } else {
+                switch (getState()) {
+                    case NORMAL:
+                        onNormalState();
+                        break;
+                    case PROGRESS:
+                        onProgressState();
+                        break;
+                    case ERROR:
+                        onErrorState();
+                        break;
+                    case COMPLETE:
+                        onCompleteState();
+                        break;
+                }
+            }
+            super.setEnabled(enabled);
         }
     }
 
